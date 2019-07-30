@@ -10,7 +10,7 @@ class Order extends Model
     const REFUND_STATUS_APPLIED = 'applied';
     const REFUND_STATUS_PROCESSING = 'processing';
     const REFUND_STATUS_SUCCESS = 'success';
-    const REFUND_STATUS_FAILD = 'faild';
+    const REFUND_STATUS_FAILED  = 'faild';
 
     const SHIP_STATUS_PENDING = 'pending';
     const SHIP_STATUS_DELIVERED = 'delivered';
@@ -86,7 +86,7 @@ class Order extends Model
     	return $this->hasMany(OrderItem::class);
     }
 
-    public function findAvalibaleNo(){
+    public static function findAvalibaleNo(){
     	$prefix = date('YmdHis');
     	for($i=0;$i<10;$i++){
     		//随机生成六位数字的
