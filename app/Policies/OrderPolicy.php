@@ -15,7 +15,7 @@ class OrderPolicy
      *
      * @return void
      */
-    public function own(User $user,Order $ordre)
+    public function own(User $user,Order $order)
     {
         return $user->id == $order->user_id;
     }

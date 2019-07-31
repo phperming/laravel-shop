@@ -5,10 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Requests\OrderRequest;
 use App\Models\UserAddress;
-use Carbon\Carbon;
-use App\Models\ProductSku;
 use App\Models\Order;
-use App\Jobs\CloseOrder;
+use App\Services\OrderService;
 
 
 class OrdersController extends Controller
@@ -25,74 +23,18 @@ class OrdersController extends Controller
 		return view('orders.index',['orders'=>$orders]);
 	}
 
-    public function store(OrderRequest $request)
+	//利用laravel 的自动解析功能注入CartService
+    public function store(OrderRequest $request,OrderService $orderService)
     {
     	$user = $request->user();
+    	$address = UserAddress::find($request->input('address_id'));
 
-    	//开启一个数据库事务
-    	$order = \DB::transaction(function() use($user,$request){
-    		$address = UserAddress::find($request->input('address_id'));
-    		//更新此地址的最后一次使用时间
-    		$address->update(['last_used_at'=>Carbon::now()]);
-
-    		//创建一个订单
-    		$order = new Order([
-    			'address' => [
-    				//将地址放入订单信息中
-    				'address' => $address->full_address,
-    				'zip' => $address->zip,
-    				'contact_name' => $address->contact_name,
-    				'cintact_phone' => $address->contact_phone
-    			],
-    			'remark' => $request->input('remark'),
-    			'total_amount'=>0,
-    		]);
-
-    		//将订单关联到用户
-    		$order->user()->associate($user);
-    		//写入数据库
-    		$order->save();
-
-    		$totalAmount = 0;
-    		$items = $request->input('items');
-
-    		//遍历用户提交的SKU
-    		foreach($items as $data){
-    			$sku = ProductSku::find($data['sku_id']);
-    			//创建一个orderItem直接与订单关联
-    			$item = $order->items()->make([
-    				'amount' => $data['amount'],
-    				'price' => $sku->price,
-    			]);
-    			$item->product()->associate($sku->product_id);
-    			$item->productSku()->associate($sku);
-    			$item->save();
-    			$totalAmount+= $sku->price * $data['amount'];
-
-    			if($sku->decreaseStock($data['amount']) <= 0){
-    				throw new InvalidRequestException("该商品库存不足");
-    				
-    			}
-    		}
-
-    		//更新订单总金额
-    		$order->update(['total_amount'=>$totalAmount]);
-
-    		//将下单的商品从购物车移除
-    		$skuIds = collect($items)->pluck('sku_id');
-    		$user->cartItems()->whereIn('product_sku_id',$skuIds)->delete();
-
-    		return $order;
-    	});
-
-    	$this->dispatch(new CloseOrder($order,config('app.order_ttl')));
-
-    	return $order;
+    	return $orderService->store($user,$address,$request->input('remark'),$request->input('items'));
     }
 
     public function show(Order $order,Request $request)
     {
-    	$this->authorize('own',$oder);
+    	$this->authorize('own',$order);
     	return view('orders.show',['order'=>$order->load(['items.product','items.productSku'])]);
     }
 }
