@@ -19,8 +19,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton('alipay',function(){
             $config = config('pay.alipay');
             //判断当前环境是否为线上环境
-            if(app()->environment() !== 'product'){
-                $config['mod']  ='dev';
+            if(app()->environment() !== 'production'){
+                $config['mode']  ='dev';
                 $config['log']['level'] = Logger::DEBUG;
             }else{
                 $config['log']['level'] = Logger::WARNING;
@@ -31,7 +31,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton('wechat_pay',function(){
-            if(app()->environment() !== 'product'){
+            if(app()->environment() !== 'production'){
                 $config['log']['level'] = Logger::DEBUG;
             }else{
                 $config['log']['level'] = Logger::WARNING;
