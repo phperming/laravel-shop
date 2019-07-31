@@ -89,4 +89,10 @@ class OrdersController extends Controller
 
     	return $order;
     }
+
+    public function show(Order $order,Request $request)
+    {
+    	$this->authorize('own',$oder);
+    	return view('orders.show',['order'=>$order->load(['items.product','items.productSku'])]);
+    }
 }
