@@ -26,6 +26,24 @@ class PaymentController extends Controller
     	]);
     }
 
+    public function payByWechat(Order $order,Request $request)
+    {
+    	//判断订单是否属于当前用户
+    	$this->authorize('own',$order);
+    	//检验订单状态
+    	if($order->closed || $order->paid_at)
+    	{
+    		throw new InvalidRequestException("订单状态不正确");
+    		
+    	}
+
+    	return app('wechat_pay')->san([
+    		'out_trade_no' =>$order->no,
+    		'total_fee' => $order->total_amount,
+    		'body' => '支付Laravel订单:'.$order->no, 
+    	]);
+    }
+
     //同步回调
     public function alipayReturn()
     {
@@ -69,5 +87,36 @@ class PaymentController extends Controller
     	]);
 
     	return app('alipay')->success();
+    }
+
+    // 微信异步回调
+    public function webchatNotify()
+    {
+    	//检验回调参数
+    	$data = app('wechat_pay')->verify();
+
+    	//从数据库找到对应的订单
+    	$order = Order::where('no',$data->out_trade_no)->first();
+
+    	if(!$order)
+    	{
+    		return 'fail';
+    	}
+
+    	//订单已支付
+    	if($order->paid_at)
+    	{
+    		return app('wechat_pay')->success();
+    	}
+
+    	//将订单标记为已支付
+    	$order->update([
+    		'paid_at' => Carbon::now(),
+    		'payment_method' => 'wechat',
+    		'payment_no' => $data->transaction_id,
+
+    	]);
+
+    	return app('wechat_pay')->success();
     }
 }
