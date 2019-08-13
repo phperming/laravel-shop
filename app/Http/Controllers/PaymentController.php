@@ -6,6 +6,7 @@ use App\Models\Order;
 use App\Exceptions\InvalidRequestException;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Endroid\QrCode\QrCode;
 
 class PaymentController extends Controller
 {
@@ -37,11 +38,17 @@ class PaymentController extends Controller
     		
     	}
 
-    	return app('wechat_pay')->san([
+    	$wechatOrder = app('wechat_pay')->san([
     		'out_trade_no' =>$order->no,
     		'total_fee' => $order->total_amount,
     		'body' => '支付Laravel订单:'.$order->no, 
     	]);
+
+    	//把要转换的字符串作物QRcode构造函数的参数
+    	$qrCode = new QrCode($wechatOrder->code_url);
+
+    	// 将生成的二维码图片数据以字符串形式输出，并带上相应的响应类型
+        return response($qrCode->writeString(), 200, ['Content-Type' => $qrCode->getContentType()]);
     }
 
     //同步回调
