@@ -9,6 +9,8 @@ use Encore\Admin\Form;
 use Encore\Admin\Grid;
 use Encore\Admin\Layout\Content;
 use Encore\Admin\Show;
+use Illuminate\Http\Request;
+use App\Exceptions\InvalidRequestException;
 
 class OrdersController extends Controller
 {
@@ -42,34 +44,6 @@ class OrdersController extends Controller
             ->body(view('admin.orders.show',['order' => $order]));
     }
 
-    /**
-     * Edit interface.
-     *
-     * @param mixed $id
-     * @param Content $content
-     * @return Content
-     */
-    public function edit($id, Content $content)
-    {
-        return $content
-            ->header('Edit')
-            ->description('description')
-            ->body($this->form()->edit($id));
-    }
-
-    /**
-     * Create interface.
-     *
-     * @param Content $content
-     * @return Content
-     */
-    public function create(Content $content)
-    {
-        return $content
-            ->header('Create')
-            ->description('description')
-            ->body($this->form());
-    }
 
     /**
      * Make a grid builder.
@@ -114,63 +88,37 @@ class OrdersController extends Controller
         return $grid;
     }
 
-    /**
-     * Make a show builder.
-     *
-     * @param mixed $id
-     * @return Show
-     */
-    protected function detail($id)
+    public function ship(Order $order,Request $request)
     {
-        $show = new Show(Order::findOrFail($id));
+        //判断当前订单是否已支付
+        if (!$order->paid_at) {
+            throw new invalidRequestException('该订单未支付');           
+        }
+        //判断当前订单是否为已发货
+        if ($order->ship_status !== Order::SHIP_STATUS_PENDING) {
+            throw new invalidRequestException('该订单已经发货');
+        }
 
-        $show->id('Id');
-        $show->no('No');
-        $show->user_id('User id');
-        $show->address('Address');
-        $show->total_amount('Total amount');
-        $show->remark('Remark');
-        $show->paid_at('Paid at');
-        $show->payment_method('Payment method');
-        $show->payment_no('Payment no');
-        $show->refund_status('Refund status');
-        $show->refund_no('Refund no');
-        $show->closed('Closed');
-        $show->reviewed('Reviewed');
-        $show->ship_status('Ship status');
-        $show->ship_data('Ship data');
-        $show->extra('Extra');
-        $show->created_at('Created at');
-        $show->updated_at('Updated at');
+        //laravel5.5之后 validate返回校验过后的值
+        $data = $this->validate($request,[
+            'express_company' => ['required'],
+            'express_no'  => ['required'],
+        ],[],[
+            'express_company' => '物流公司',
+            'express_no' => '物流单号',
+        ]);
 
-        return $show;
+        //将订单状态改为已发货，并存入物流信息
+        $order->update([
+            'ship_status' => Order::SHIP_STATUS_DELIVERED,
+            // 我们在 Order 模型的 $casts 属性里指明了 ship_data 是一个数组
+            // 因此这里可以直接把数组传过去
+            'ship_data' => $data,
+        ]);
+
+        //返回上一页
+        return redirect()->back();
     }
 
-    /**
-     * Make a form builder.
-     *
-     * @return Form
-     */
-    protected function form()
-    {
-        $form = new Form(new Order);
-
-        $form->text('no', 'No');
-        $form->number('user_id', 'User id');
-        $form->textarea('address', 'Address');
-        $form->decimal('total_amount', 'Total amount');
-        $form->textarea('remark', 'Remark');
-        $form->datetime('paid_at', 'Paid at')->default(date('Y-m-d H:i:s'));
-        $form->text('payment_method', 'Payment method');
-        $form->text('payment_no', 'Payment no');
-        $form->text('refund_status', 'Refund status')->default('pending');
-        $form->text('refund_no', 'Refund no');
-        $form->switch('closed', 'Closed');
-        $form->switch('reviewed', 'Reviewed');
-        $form->text('ship_status', 'Ship status')->default('pending');
-        $form->textarea('ship_data', 'Ship data');
-        $form->textarea('extra', 'Extra');
-
-        return $form;
-    }
+  
 }
