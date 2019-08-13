@@ -7,6 +7,7 @@ use App\Http\Requests\OrderRequest;
 use App\Models\UserAddress;
 use App\Models\Order;
 use App\Services\OrderService;
+use App\Exceptions\InvalidRequestException;
 
 
 class OrdersController extends Controller
@@ -36,5 +37,24 @@ class OrdersController extends Controller
     {
     	$this->authorize('own',$order);
     	return view('orders.show',['order'=>$order->load(['items.product','items.productSku'])]);
+    }
+
+    public function  received(Order $order,Request $request)
+    {
+    	//检验权限
+    	$this->authorize('own',$order);
+
+    	//判断订单是否是已发货状态
+    	if ($order->ship_status !== Order::SHIP_STATUS_DELIVERED) {
+    		throw new InvalidRequestException('该订单未发货');
+    	}
+
+    	//更新发货状态为已收货
+    	$order->update([
+    		'ship_status' => Order::SHIP_STATUS_RECEIVED,
+    	]);
+
+    	// 返回订单信息
+        return $order;
     }
 }
