@@ -131,13 +131,15 @@ class OrdersController extends Controller
     	$extra['refund_reason'] = $request->input('reason');
     	//将订单退款状态修改为已申请退款状态
     	$order->update([
-    		'refound_status' => Order::REFUND_STATUS_APPLIED,
+    		'refund_status' => Order::REFUND_STATUS_APPLIED,
     		'extra' => $extra,
     	]);
 
     	return $order;
 
     }
+
+
     
 
 }
