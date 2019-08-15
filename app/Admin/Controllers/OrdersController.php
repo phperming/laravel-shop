@@ -130,7 +130,15 @@ class OrdersController extends Controller
         }
 
         if ($request->input('agree')){
+            //清空提款拒绝理由
+            $extra = $order->extra?:[];
+            unset($extra['refund_disagree_reason']);
+            $order->update([
+                'extra' => $extra,
+            ]);
 
+            //调用退款逻辑
+            $this->_refundOrder($order);
         }else{
             //拒接退款理由放到订单extra字段中
             $extra = $order->extra ?:[];
@@ -144,6 +152,50 @@ class OrdersController extends Controller
         }
 
         return $order;
+    }
+
+    protected function _refundOrder(Order $order)
+    {
+        //判断该订单的支付方式
+        switch($order->payment_method)
+        {
+            case 'wechat':
+
+                break;
+            case 'alipay':
+                //生成退款订单号
+                $refund_no = Order::getAvailableRefundNo();
+                //调用支付宝实例的refund方法
+                $ret = app('alipay')->refund([
+                    'out_trade_no' => $order->no,
+                    'refund_amount' => $order->total_amount,
+                    'out_request_no' => $refund_no
+                ]);
+
+                // 根据支付宝的文档，如果返回值里有 sub_code 字段说明退款失败
+                if ($ret->sub_code){
+                    //将退款失败保存到extra字段
+                    $extra = $order->extra;
+                    $extra['refund_failed_code'] = $ret->sub_code;
+                    //将订单的退款状态改为退款失败状态
+                    $order->update([
+                        'refund_no' => $refund_no,
+                        'refund_status' => Order::REFUND_STATUS_FAILED,
+                        'extra' => $extra
+                    ]);
+
+                }else{
+                    //将订单状态改为退款成功的状态
+                    $order->update([
+                        'refund_no' => $refund_no,
+                        'refund_status' => Order::REFUND_STATUS_SUCCESS,
+                    ]);
+                }
+                break;
+            default:
+                throw  new InvalidRequestException('未知的订单支付方式：'.$order->payment_method);
+                break;
+        }
     }
 
   
